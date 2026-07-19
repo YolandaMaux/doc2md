@@ -1,0 +1,84 @@
+#Since the ARG defaults to "false", you can just build it normally:
+
+
+# podman build -t doc2md_image .
+
+# To build the heavy version with Whisper:
+# docker build --build-arg INCLUDE_WHISPER="true" -t doc2md_image .
+
+# podman run --rm --name doc2md_image_1 -p 8090:8090 doc2md_image
+# podman stop doc2md_image_1
+
+FROM python:3.13-slim
+
+# Environment settings
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Point HuggingFace to the mounted model volume
+ENV HF_HOME=/models/huggingface
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+ENV EXPOSED_PORT=8090
+
+# ---------------------------------------------------------------------------
+# Build Arguments
+# Define INCLUDE_WHISPER flag (defaults to false)
+# ---------------------------------------------------------------------------
+ARG INCLUDE_WHISPER="false"
+
+# ---------------------------------------------------------------------------
+# System dependencies (Conditionally installed based on ARG)
+# ---------------------------------------------------------------------------
+RUN if [ "$INCLUDE_WHISPER" = "true" ] ; then \
+        apt-get update && apt-get install -y --no-install-recommends \
+            ffmpeg \
+            gcc \
+            g++ \
+            build-essential \
+            ca-certificates \
+        && update-ca-certificates \
+        && rm -rf /var/lib/apt/lists/* ; \
+    else \
+        echo "Skipping Whisper system dependencies" ; \
+    fi
+
+# (Optional) Custom pip config for corporate certs
+# COPY pip_custom.conf /etc/pip.conf
+
+# Create a non-root user for security
+RUN useradd -m -s /bin/bash appuser
+
+WORKDIR /app
+
+# ---------------------------------------------------------------------------
+# Requirements Installation (Conditionally selects the correct file)
+# ---------------------------------------------------------------------------
+# We copy BOTH requirements files into the container temporarily
+COPY doc2md_chunker/requirements.txt /app/requirements_standard.txt
+COPY doc2md_chunker/requirements_with_whisper.txt /app/requirements_whisper.txt
+
+# Run pip install based on the INCLUDE_WHISPER flag
+RUN if [ "$INCLUDE_WHISPER" = "true" ] ; then \
+        pip install --no-cache-dir -r /app/requirements_whisper.txt ; \
+    else \
+        pip install --no-cache-dir -r /app/requirements_standard.txt ; \
+    fi
+
+# Copy the actual application code
+COPY doc2md_chunker /app/doc2md_chunker
+
+# Create directories, change ownership, and set permissions
+RUN mkdir -p /models/huggingface /var/log/app && \
+    chown -R appuser:appuser /app /models/huggingface /var/log/app && \
+    chmod -R 775 /var/log/app
+
+# Switch to the non-root user
+USER appuser
+
+WORKDIR /app/doc2md_chunker
+
+EXPOSE 8090
+
+# Run using a production ASGI server
+CMD ["uvicorn", "doc2md_chunker:app", "--host", "0.0.0.0", "--port", "8090", "--loop", "asyncio", "--root-path", "/doc2md"]

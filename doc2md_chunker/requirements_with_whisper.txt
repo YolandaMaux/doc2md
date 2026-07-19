@@ -1,0 +1,43 @@
+fastapi
+uvicorn
+httpx
+loguru
+python-multipart
+python-dotenv
+pydantic
+chonkie
+chonkie[st]
+chonkie[model2vec]
+chonkie[semantic]
+email-validator
+markitdown
+pymupdf4llm
+docx2md
+pptx2md
+openpyxl
+mammoth
+qdrant_client
+python-docx
+
+# ---------------------------------------------------------------------------
+# /media_to_text — OpenAI Whisper (speech-to-text, 99+ languages)
+# ---------------------------------------------------------------------------
+openai-whisper  # >=20240930
+ffmpeg-python   #>=0.2.0           # Python bindings used by openai-whisper
+numba           #>=0.57.0                  # JIT acceleration used internally by Whisper
+numpy           #>=1.24.0
+
+
+# PyTorch — required by Whisper.
+# The line below installs the CPU-only wheel (small, works everywhere).
+# For CUDA GPU support, comment out the line below and instead run:
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
+torch           #>=2.1.0
+torchaudio      #>=2.1.0
+
+# ---------------------------------------------------------------------------
+# Whisper tokeniser dependency
+# ---------------------------------------------------------------------------
+tiktoken        #>=0.6.0
+more-itertools  # >=9.0.0
+tqdm			#>=4.66.0
