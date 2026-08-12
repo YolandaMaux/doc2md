@@ -20,6 +20,7 @@ ENV HF_HOME=/models/huggingface
 ENV HF_HUB_OFFLINE=1
 ENV TRANSFORMERS_OFFLINE=1
 ENV EXPOSED_PORT=8090
+ENV DOC2MD_TMP_BASE=/tmp/doc2md
 
 # ---------------------------------------------------------------------------
 # Build Arguments
@@ -69,9 +70,9 @@ RUN if [ "$INCLUDE_WHISPER" = "true" ] ; then \
 COPY doc2md_chunker /app/doc2md_chunker
 
 # Create directories, change ownership, and set permissions
-RUN mkdir -p /models/huggingface /var/log/app && \
-    chown -R appuser:appuser /app /models/huggingface /var/log/app && \
-    chmod -R 775 /var/log/app
+RUN mkdir -p /models/huggingface /var/log/app /tmp/doc2md && \
+    chown -R appuser:appuser /app /models/huggingface /var/log/app /tmp/doc2md && \
+    chmod -R 775 /var/log/app /tmp/doc2md
 
 # Switch to the non-root user
 USER appuser

@@ -25,7 +25,7 @@ from fastapi import Security
 from fastapi.security import APIKeyHeader
 
 # Header name nginx expects.  Override via NGINX_API_KEY_HEADER env var.
-_HEADER_NAME: str = os.getenv("NGINX_API_KEY_HEADER", "X-API-Key")
+_HEADER_NAME: str = os.getenv("DOC2MD_NGINX_API_KEY_HEADER", "X-API-Key")
 
 nginx_api_key_scheme = APIKeyHeader(
     name=_HEADER_NAME,

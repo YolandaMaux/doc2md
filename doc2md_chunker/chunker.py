@@ -58,7 +58,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Model path resolution (airgap-safe: prefers local copy over HF Hub)
 # ---------------------------------------------------------------------------
-STATIC_MODEL_ROOT = os.getenv("STATIC_MODEL_ROOT", "/models/huggingface")
+STATIC_MODEL_ROOT = os.getenv("DOC2MD_STATIC_MODEL_ROOT", "/models/huggingface")
 
 
 def _resolve_model_path(model_name: str) -> str:
@@ -75,46 +75,46 @@ def _resolve_model_path(model_name: str) -> str:
 
 
 _SEMANTIC_MODEL_DEFAULT = _resolve_model_path(
-    os.getenv("SEMANTIC_CHUNKER_MODEL", "minishlab/potion-base-32M")
+    os.getenv("DOC2MD_SEMANTIC_CHUNKER_MODEL", "minishlab/potion-base-32M")
 )
 _SDPM_MODEL_DEFAULT = _resolve_model_path(
-    os.getenv("SDPM_CHUNKER_MODEL", "minishlab/potion-base-32M")
+    os.getenv("DOC2MD_SDPM_CHUNKER_MODEL", "minishlab/potion-base-32M")
 )
 _LATE_MODEL_DEFAULT = _resolve_model_path(
-    os.getenv("LATE_CHUNKER_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+    os.getenv("DOC2MD_LATE_CHUNKER_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 )
 _NEURAL_MODEL_DEFAULT = _resolve_model_path(
-    os.getenv("NEURAL_CHUNKER_MODEL", "mirth/chonky_modernbert_large_1")
+    os.getenv("DOC2MD_NEURAL_CHUNKER_MODEL", "mirth/chonky_modernbert_large_1")
 )
 
 # ---------------------------------------------------------------------------
 # HTTP / LLM config
 # ---------------------------------------------------------------------------
-HTTPX_TIMEOUT = httpx.Timeout(float(os.getenv("HTTPX_TIMEOUT", "600.0")))
+HTTPX_TIMEOUT = httpx.Timeout(float(os.getenv("DOC2MD_HTTPX_TIMEOUT", "600.0")))
 
 LLM_MODEL_DEFAULT_BASE_URL = os.getenv(
-    "LLM_MODEL_DEFAULT_BASE_URL", "http://localhost:11434"
+    "DOC2MD_LLM_MODEL_DEFAULT_BASE_URL", "http://localhost:11434"
 ).rstrip("/")
-LLM_MODEL_CHAT_BASE_URL    = os.getenv("LLM_MODEL_CHAT_BASE_URL",    LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
-LLM_MODEL_TRANSLATE_BASE_URL = os.getenv("LLM_MODEL_TRANSLATE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
-LLM_MODEL_CHUNK_BASE_URL   = os.getenv("LLM_MODEL_CHUNK_BASE_URL",   LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
-LLM_MODEL_CLASSIFIER_BASE_URL = os.getenv("LLM_MODEL_CLASSIFIER_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
-LLM_MODEL_TABLE_BASE_URL   = os.getenv("LLM_MODEL_TABLE_BASE_URL",   LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
-LLM_MODEL_OCR_BASE_URL     = os.getenv("LLM_MODEL_OCR_BASE_URL",     LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
-LLM_MODEL_PICTURE_BASE_URL = os.getenv("LLM_MODEL_PICTURE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
+LLM_MODEL_CHAT_BASE_URL    = os.getenv("DOC2MD_LLM_MODEL_CHAT_BASE_URL",    LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
+LLM_MODEL_TRANSLATE_BASE_URL = os.getenv("DOC2MD_LLM_MODEL_TRANSLATE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
+LLM_MODEL_CHUNK_BASE_URL   = os.getenv("DOC2MD_LLM_MODEL_CHUNK_BASE_URL",   LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
+LLM_MODEL_CLASSIFIER_BASE_URL = os.getenv("DOC2MD_LLM_MODEL_CLASSIFIER_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
+LLM_MODEL_TABLE_BASE_URL   = os.getenv("DOC2MD_LLM_MODEL_TABLE_BASE_URL",   LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
+LLM_MODEL_OCR_BASE_URL     = os.getenv("DOC2MD_LLM_MODEL_OCR_BASE_URL",     LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
+LLM_MODEL_PICTURE_BASE_URL = os.getenv("DOC2MD_LLM_MODEL_PICTURE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL).rstrip("/")
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",")
+ALLOWED_ORIGINS = os.getenv("DOC2MD_ALLOWED_ORIGINS", "").split(",")
 
 # ---------------------------------------------------------------------------
 # SlumberChunker LLM backend
 # ---------------------------------------------------------------------------
-_SLUMBER_BACKEND       = os.getenv("LLM_SLUMBER_BACKEND", "ollama").lower()
-_SLUMBER_OLLAMA_MODEL  = os.getenv("LLM_SLUMBER_OLLAMA_MODEL", "gemma3:4b")
+_SLUMBER_BACKEND       = os.getenv("DOC2MD_LLM_SLUMBER_BACKEND", "ollama").lower()
+_SLUMBER_OLLAMA_MODEL  = os.getenv("DOC2MD_LLM_SLUMBER_OLLAMA_MODEL", "gemma3:4b")
 _SLUMBER_LOCAL_MODEL   = _resolve_model_path(
-    os.getenv("LLM_SLUMBER_LOCAL_MODEL", "Qwen/Qwen2.5-1.5B-Instruct")
+    os.getenv("DOC2MD_LLM_SLUMBER_LOCAL_MODEL", "Qwen/Qwen2.5-1.5B-Instruct")
 )
-_SLUMBER_LOCAL_MAX_NEW = int(os.getenv("LLM_SLUMBER_LOCAL_MAX_NEW_TOKENS", "512"))
-_SLUMBER_LOCAL_TEMP    = float(os.getenv("LLM_SLUMBER_LOCAL_TEMPERATURE", "0.1"))
+_SLUMBER_LOCAL_MAX_NEW = int(os.getenv("DOC2MD_LLM_SLUMBER_LOCAL_MAX_NEW_TOKENS", "512"))
+_SLUMBER_LOCAL_TEMP    = float(os.getenv("DOC2MD_LLM_SLUMBER_LOCAL_TEMPERATURE", "0.1"))
 
 # Lazy-loaded local pipeline (only initialised when backend=="local")
 _local_pipeline = None

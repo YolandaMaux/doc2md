@@ -25,69 +25,69 @@ from pydantic import BaseModel, Field
 ENV_PATH = Path(__file__).resolve().parent.parent / "doc2md_chunker.env"
 load_dotenv(ENV_PATH)
 
-HTTPX_TIMEOUT = httpx.Timeout(float(os.getenv("HTTPX_TIMEOUT", "600.0")))
+HTTPX_TIMEOUT = httpx.Timeout(float(os.getenv("DOC2MD_HTTPX_TIMEOUT", "600.0")))
 
 LLM_MODEL_DEFAULT_BASE_URL = os.getenv(
-    "LLM_MODEL_DEFAULT_BASE_URL", "http://localhost:8080"
+    "DOC2MD_LLM_MODEL_DEFAULT_BASE_URL", "http://localhost:8080"
 ).rstrip("/")
 
 LLM_MODEL_CHAT_BASE_URL = os.getenv(
-    "LLM_MODEL_CHAT_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_CHAT_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 
 LLM_MODEL_TRANSLATE_BASE_URL = os.getenv(
-    "LLM_MODEL_TRANSLATE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_TRANSLATE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 
 LLM_MODEL_CHUNK_BASE_URL = os.getenv(
-    "LLM_MODEL_CHUNK_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_CHUNK_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 
 LLM_MODEL_CLASSIFIER_BASE_URL = os.getenv(
-    "LLM_MODEL_CLASSIFIER_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_CLASSIFIER_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 
 LLM_MODEL_TABLE_BASE_URL = os.getenv(
-    "LLM_MODEL_TABLE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_TABLE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 
 LLM_MODEL_OCR_BASE_URL = os.getenv(
-    "LLM_MODEL_OCR_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_OCR_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 
 LLM_MODEL_PICTURE_BASE_URL = os.getenv(
-    "LLM_MODEL_PICTURE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_PICTURE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 
 LLM_MODEL_FIGURE_BASE_URL = os.getenv(
-    "LLM_MODEL_FIGURE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_FIGURE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 # ---------------------------------------------------------------------------
 # Environment / defaults
 # ---------------------------------------------------------------------------
-MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
-DEFAULT_TEMPERATURE = float(os.getenv("LLM_OCR_TEMPERATURE", "0.1"))
+MAX_UPLOAD_BYTES = int(os.getenv("DOC2MD_MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
+DEFAULT_TEMPERATURE = float(os.getenv("DOC2MD_LLM_OCR_TEMPERATURE", "0.1"))
 
 IMAGE_EXTS = set(
-    os.getenv("IMAGE_EXTS", ".png,.jpg,.jpeg,.webp,.bmp,.tiff").split(",")
+    os.getenv("DOC2MD_IMAGE_EXTS", ".png,.jpg,.jpeg,.webp,.bmp,.tiff").split(",")
 )
 
-MODEL_CLASSIFIER = os.getenv("LLM_MODEL_CLASSIFIER", "llama3.2-vision:11b")
-MODEL_OCR = os.getenv("LLM_MODEL_OCR", "glm-ocr:bf16")
-MODEL_TABLE = os.getenv("LLM_MODEL_TABLE", "glm-ocr:bf16")
-MODEL_FIGURE = os.getenv("LLM_MODEL_FIGURE", "glm-ocr:bf16")
-MODEL_PICTURE = os.getenv("LLM_MODEL_PICTURE", "llama3.2-vision:11b")
+MODEL_CLASSIFIER = os.getenv("DOC2MD_LLM_MODEL_CLASSIFIER", "llama3.2-vision:11b")
+MODEL_OCR = os.getenv("DOC2MD_LLM_MODEL_OCR", "glm-ocr:bf16")
+MODEL_TABLE = os.getenv("DOC2MD_LLM_MODEL_TABLE", "glm-ocr:bf16")
+MODEL_FIGURE = os.getenv("DOC2MD_LLM_MODEL_FIGURE", "glm-ocr:bf16")
+MODEL_PICTURE = os.getenv("DOC2MD_LLM_MODEL_PICTURE", "llama3.2-vision:11b")
 
 # ---------------------------------------------------------------------------
 # /media_to_text — Whisper defaults (override via .env)
 # ---------------------------------------------------------------------------
-WHISPER_MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "base")
+WHISPER_MODEL_SIZE = os.getenv("DOC2MD_WHISPER_MODEL_SIZE", "base")
 AUDIO_EXTS = set(
-    os.getenv("AUDIO_EXTS", ".mp3,.wav,.flac,.ogg,.m4a,.aac,.wma,.opus,.webm").split(",")
+    os.getenv("DOC2MD_AUDIO_EXTS", ".mp3,.wav,.flac,.ogg,.m4a,.aac,.wma,.opus,.webm").split(",")
 )
 
 VIDEO_EXTS = set(
-    os.getenv("VIDEO_EXTS", ".mp4,.mkv,.avi,.mov,.flv,.wmv,.ts,.3gp").split(",")
+    os.getenv("DOC2MD_VIDEO_EXTS", ".mp4,.mkv,.avi,.mov,.flv,.wmv,.ts,.3gp").split(",")
 )
 
 MEDIA_EXTS = AUDIO_EXTS | VIDEO_EXTS
@@ -956,14 +956,14 @@ async def media_to_text(
 # ---------------------------------------------------------------------------
 
 GENERAL_LLM_SYSTEM_PROMPT = os.getenv(
-    "GENERAL_LLM_SYSTEM_PROMPT",
+    "DOC2MD_GENERAL_LLM_SYSTEM_PROMPT",
     "You are a helpful, accurate, and concise AI assistant.",
 )
 
-GENERAL_LLM_USER_PROMPT = os.getenv("GENERAL_LLM_USER_PROMPT", " ")
-GENERAL_LLM_TEMPERATURE = float(os.getenv("GENERAL_LLM_TEMPERATURE", "0.1"))
-GENERAL_LLM_MAX_TOKENS = int(os.getenv("GENERAL_LLM_MAX_TOKENS", "4096"))
-GENERAL_LLM_MODEL = os.getenv("GENERAL_LLM_MODEL", "gemma3:12b")
+GENERAL_LLM_USER_PROMPT = os.getenv("DOC2MD_GENERAL_LLM_USER_PROMPT", " ")
+GENERAL_LLM_TEMPERATURE = float(os.getenv("DOC2MD_GENERAL_LLM_TEMPERATURE", "0.1"))
+GENERAL_LLM_MAX_TOKENS = int(os.getenv("DOC2MD_GENERAL_LLM_MAX_TOKENS", "4096"))
+GENERAL_LLM_MODEL = os.getenv("DOC2MD_GENERAL_LLM_MODEL", "gemma3:12b")
 
 
 class GeneralLLMChatResponse(BaseModel):

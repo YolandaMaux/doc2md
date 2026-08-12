@@ -1,0 +1,54 @@
+FROM python:3.13-slim
+
+# Environment settings
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Point HuggingFace to the mounted model volume
+ENV HF_HOME=/models/huggingface
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+
+# ---------------------------------------------------------------------------
+# System dependencies
+#   ffmpeg   — required by openai-whisper to decode audio/video files
+#   build-essential / gcc — needed to compile numba / llvmlite wheels on slim
+# ---------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        gcc \
+        g++ \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+####### Section for adding certs and pip.conf
+# for certs add this line to the above. 
+#        ca-certificates \ 
+# Then add the following 
+# Copy your CA cert(s) from build context
+#COPY mycorp-root-ca.crt /usr/local/share/ca-certificates/
+# Update system CA bundle
+#RUN update-ca-certificates
+# custom pip config with certs etc.
+#COPY pip_custom.conf /etc/pip.conf
+####### END
+
+# Create working directory
+WORKDIR /app
+
+# Copy requirements and install
+COPY doc2md_chunker/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# Copy the actual application code
+COPY doc2md_chunker /app/doc2md_chunker
+
+# Set working dir to the package folder
+WORKDIR /app/doc2md_chunker
+
+# Expose the FastAPI port used in doc2md_chunker.py 
+ENV EXPOSED_PORT=8090
+EXPOSE 8090
+
+# Run the unified entrypoint
+CMD ["python", "doc2md_chunker.py"]

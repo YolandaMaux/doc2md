@@ -33,60 +33,60 @@ import utils
 ENV_PATH = Path(__file__).resolve().parent.parent / "doc2md_chunker.env"
 load_dotenv(ENV_PATH)
 
-HTTPX_TIMEOUT = httpx.Timeout(float(os.getenv("HTTPX_TIMEOUT", "600.0")))
+HTTPX_TIMEOUT = httpx.Timeout(float(os.getenv("DOC2MD_HTTPX_TIMEOUT", "600.0")))
 
 LLM_MODEL_DEFAULT_BASE_URL = os.getenv(
-    "LLM_MODEL_DEFAULT_BASE_URL", "http://localhost:11434"
+    "DOC2MD_LLM_MODEL_DEFAULT_BASE_URL", "http://localhost:11434"
 ).rstrip("/")
 
 LLM_MODEL_CHAT_BASE_URL = os.getenv(
-    "LLM_MODEL_CHAT_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_CHAT_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 
 LLM_MODEL_TRANSLATE_BASE_URL = os.getenv(
-    "LLM_MODEL_TRANSLATE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_TRANSLATE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 
 LLM_MODEL_CHUNK_BASE_URL = os.getenv(
-    "LLM_MODEL_CHUNK_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_CHUNK_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 
 LLM_MODEL_CLASSIFIER_BASE_URL = os.getenv(
-    "LLM_MODEL_CLASSIFIER_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_CLASSIFIER_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 
 LLM_MODEL_TABLE_BASE_URL = os.getenv(
-    "LLM_MODEL_TABLE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_TABLE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 
 LLM_MODEL_OCR_BASE_URL = os.getenv(
-    "LLM_MODEL_OCR_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_OCR_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 
 LLM_MODEL_PICTURE_BASE_URL = os.getenv(
-    "LLM_MODEL_PICTURE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+    "DOC2MD_LLM_MODEL_PICTURE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
 # ---------------------------------------------------------------------------
 # Environment / defaults
 # ---------------------------------------------------------------------------
-MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
-APP_TMP_BASE = Path(os.getenv("APP_TMP_BASE", "/home/riaz/Code/testAPIs/doc2md_chunker/tmp"))
+MAX_UPLOAD_BYTES = int(os.getenv("DOC2MD_MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
+APP_TMP_BASE = Path(os.getenv("DOC2MD_APP_TMP_BASE", "/tmp/doc2md_"))
 APP_TMP_BASE.mkdir(parents=True, exist_ok=True)
-KEEP_TMP = os.getenv("KEEP_TMP", "false").lower() == "true"
+KEEP_TMP = os.getenv("DOC2MD_KEEP_TMP", "false").lower() == "true"
 KEEP_TMP = True
-LOG_DIR = Path(os.getenv("LOG_DIR", "/home/riaz/Code/testAPIs/doc2md_chunker/var/log/app"))
+LOG_DIR = Path(os.getenv("DOC2MD_LOG_DIR", "/home/riaz/Code/testAPIs/doc2md_chunker/var/log/app"))
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 logger.add(LOG_DIR / "app.log", rotation="10 MB", retention=10)
-FIXED_TEMPERATURE = float(os.getenv("LLM_OCR_TEMPERATURE", "0.1"))
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+FIXED_TEMPERATURE = float(os.getenv("DOC2MD_LLM_OCR_TEMPERATURE", "0.1"))
+ALLOWED_ORIGINS = os.getenv("DOC2MD_ALLOWED_ORIGINS", "*").split(",")
 
 _sync_http_client = httpx.Client(timeout=HTTPX_TIMEOUT)
 _async_http_client = httpx.AsyncClient(timeout=HTTPX_TIMEOUT)
 
-IMAGE_EXTS = set(os.getenv("IMAGE_EXTS", ".png,.jpg,.jpeg,.webp,.bmp,.tiff").split(","))
+IMAGE_EXTS = set(os.getenv("DOC2MD_IMAGE_EXTS", ".png,.jpg,.jpeg,.webp,.bmp,.tiff").split(","))
 SUPPORTED_EXTS = set(
     os.getenv(
-        "SUPPORTED_EXTS",
+        "DOC2MD_SUPPORTED_EXTS",
         ".pdf,.docx,.pptx,.xlsx,.txt,.md,.html,.htm,.csv,.json,.xml",
     ).split(",")
 )
