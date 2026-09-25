@@ -62,6 +62,10 @@ LLM_MODEL_PICTURE_BASE_URL = os.getenv(
 LLM_MODEL_FIGURE_BASE_URL = os.getenv(
     "DOC2MD_LLM_MODEL_FIGURE_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
 ).rstrip("/")
+
+LLM_MODEL_ASR_BASE_URL = os.getenv(
+    "DOC2MD_LLM_MODEL_ASR_BASE_URL", LLM_MODEL_DEFAULT_BASE_URL
+).rstrip("/")
 # ---------------------------------------------------------------------------
 # Environment / defaults
 # ---------------------------------------------------------------------------
@@ -79,9 +83,10 @@ MODEL_FIGURE = os.getenv("DOC2MD_LLM_MODEL_FIGURE", "glm-ocr:bf16")
 MODEL_PICTURE = os.getenv("DOC2MD_LLM_MODEL_PICTURE", "llama3.2-vision:11b")
 
 # ---------------------------------------------------------------------------
-# /media_to_text — Whisper defaults (override via .env)
+# /media_to_text — LLM-ASR defaults (override via .env)
 # ---------------------------------------------------------------------------
-WHISPER_MODEL_SIZE = os.getenv("DOC2MD_WHISPER_MODEL_SIZE", "base")
+ASR_MODEL = os.getenv("DOC2MD_ASR_MODEL", "qwen3-asr-1.7b")
+
 AUDIO_EXTS = set(
     os.getenv("DOC2MD_AUDIO_EXTS", ".mp3,.wav,.flac,.ogg,.m4a,.aac,.wma,.opus,.webm").split(",")
 )
@@ -211,7 +216,6 @@ async def list_features(request: Request) -> Dict[str, Any]:
             if _required is None:
                 _fi = getattr(dep, "field_info", None)
                 if _fi is not None:
-                    import inspect as _inspect
                     _req_fn = getattr(_fi, "is_required", None)
                     if callable(_req_fn):
                         _required = _req_fn()
@@ -564,17 +568,27 @@ def _describe_table(image_b64: str, model: str, temperature: float) -> str:
     )
 
 
-def _describe_figure(image_b64: str, model: str, temperature: float) -> str:
+def _describe_figure(image_b64: str, model: str, temperature: float, figure_context: Optional[str] = None) -> str:
+
     prompt = (
         "This image contains a chart, graph, diagram, or figure. Do the following:\n"
-        "1. Write a short descriptive title on the first line prefixed with TITLE: "
-        "(e.g. TITLE: Q3 Revenue by Product Line).\n"
-        "2. On the next line write the chart/diagram type prefixed with TYPE: "
-        "(e.g. TYPE: Bar Chart).\n"
+        "1. Write a short descriptive title on the first line prefixed with TITLE: \n"
+        "   Base the title ONLY on text visible inside the image itself, or on the "
+        "document context provided below if present. Never invent a generic title.\n"
+        "2. On the next line write the chart/diagram type prefixed with TYPE: \n"
+        "   Use exactly one of: Bar Chart, Line Chart, Pie Chart, Stacked Bar Chart, "
+        "Area Chart, Scatter Plot, Histogram, Box Plot, Flowchart, Diagram, Map, or Other.\n"
         "3. Write a concise description (under 100 words) prefixed with DESCRIPTION: on its own line, "
         "covering key trends, axes, legend items, and notable values.\n"
         "No commentary outside these three sections."
     )
+    if figure_context:
+        prompt += (
+            "\n\nDocument context surrounding this figure in the source document "
+            "(use it to write the TITLE when the image itself has no visible title):\n"
+            f"{figure_context}"
+        )
+
     raw = _call_vision_llm(
         prompt=prompt,
         image_b64=image_b64,
@@ -694,10 +708,19 @@ async def image_description(
         MODEL_TABLE,
         description=f"LLM used to reproduce Table images as GFM Markdown. (Env: LLM_MODEL_TABLE, default: {MODEL_TABLE})",
     ),
+
     figure_model: str = Query(
         MODEL_FIGURE,
         description=f"LLM used to describe Figure/chart images. (Env: LLM_MODEL_FIGURE, default: {MODEL_FIGURE})",
     ),
+    figure_context: Optional[str] = Query(
+        None,
+        description="Optional surrounding text or heading from the source document. "
+        "Used by the Figure describer to title the figure from real document context "
+        "when the image itself contains no visible title.",
+    ),
+
+
     picture_model: str = Query(
         MODEL_PICTURE,
         description=f"LLM used to describe Picture/illustration images. (Env: LLM_MODEL_PICTURE, default: {MODEL_PICTURE})",
@@ -765,8 +788,12 @@ async def image_description(
 
         if category == ImageCategory.picture:
             return dispatch[category](image_b64, description_model, temperature, user_prompt)
-
+    
+        if category == ImageCategory.figure and figure_context:
+            return dispatch[category](image_b64, description_model, temperature, figure_context)
+    
         return dispatch[category](image_b64, description_model, temperature)
+
 
     finally:
         if tmp_path and tmp_path.exists():
@@ -776,27 +803,48 @@ async def image_description(
                 logger.error(f"Failed to clean up temp file {tmp_path}: {exc}")
 
 
+# # ---------------------------------------------------------------------------
+# # /media_to_text — audio & video transcription via OpenAI Whisper
+# # ---------------------------------------------------------------------------
+
+# # Lazy-loaded Whisper model cache — one model instance per model_size string.
+# # Using a dict so callers can request different sizes in the same process.
+# _whisper_models: Dict[str, Any] = {}
+# _whisper_lock = threading.Lock()
+
+
+# def _get_whisper_model(model_size: str) -> Any:
+#     """Load (or return cached) a Whisper model by size name."""
+#     if model_size not in _whisper_models:
+#         with _whisper_lock:
+#             if model_size not in _whisper_models:  # double-checked locking
+#                 import whisper as _whisper  # deferred import — only pay cost if endpoint is used
+#                 logger.info(f"Loading Whisper model '{model_size}' — this may take a moment …")
+#                 _whisper_models[model_size] = _whisper.load_model(model_size)
+#                 logger.info(f"Whisper model '{model_size}' ready.")
+#     return _whisper_models[model_size]
+
+
+# def _transcribe_sync(
+#     file_path: Path,
+#     model_size: str,
+#     language: Optional[str],
+#     temperature: float,
+# ) -> dict:
+#     """
+#     Blocking Whisper transcription — run inside a thread so the event loop stays free.
+#     Returns the raw Whisper result dict (keys: text, language, segments, …).
+#     """
+#     model = _get_whisper_model(model_size)
+#     options: Dict[str, Any] = {"temperature": temperature}
+#     if language:
+#         options["language"] = language
+#     return model.transcribe(str(file_path), **options)
+
 # ---------------------------------------------------------------------------
-# /media_to_text — audio & video transcription via OpenAI Whisper
+# /media_to_text — audio & video transcription via an OpenAI-compatible
+# LLM-ASR server (Qwen3-ASR, Parakeet TDT, Canary-Qwen, Fun-ASR, …)
 # ---------------------------------------------------------------------------
-
-# Lazy-loaded Whisper model cache — one model instance per model_size string.
-# Using a dict so callers can request different sizes in the same process.
-_whisper_models: Dict[str, Any] = {}
-_whisper_lock = threading.Lock()
-
-
-def _get_whisper_model(model_size: str) -> Any:
-    """Load (or return cached) a Whisper model by size name."""
-    if model_size not in _whisper_models:
-        with _whisper_lock:
-            if model_size not in _whisper_models:  # double-checked locking
-                import whisper as _whisper  # deferred import — only pay cost if endpoint is used
-                logger.info(f"Loading Whisper model '{model_size}' — this may take a moment …")
-                _whisper_models[model_size] = _whisper.load_model(model_size)
-                logger.info(f"Whisper model '{model_size}' ready.")
-    return _whisper_models[model_size]
-
 
 def _transcribe_sync(
     file_path: Path,
@@ -805,14 +853,36 @@ def _transcribe_sync(
     temperature: float,
 ) -> dict:
     """
-    Blocking Whisper transcription — run inside a thread so the event loop stays free.
-    Returns the raw Whisper result dict (keys: text, language, segments, …).
+    Blocking ASR transcription — run inside a thread so the event loop stays free.
+    Calls an OpenAI-compatible POST /v1/audio/transcriptions endpoint, so any
+    LLM-based ASR served that way can be used (Qwen3-ASR, Parakeet TDT,
+    Canary-Qwen, Fun-ASR, …). Returns a dict with keys:
+    text, language, duration, segments.
     """
-    model = _get_whisper_model(model_size)
-    options: Dict[str, Any] = {"temperature": temperature}
+    url = f"{LLM_MODEL_ASR_BASE_URL}/v1/audio/transcriptions"
+    data: Dict[str, Any] = {
+        "model": model_size,
+        "response_format": "json",
+        "temperature": str(temperature),
+    }
     if language:
-        options["language"] = language
-    return model.transcribe(str(file_path), **options)
+        data["language"] = language
+    logger.info(f"Calling ASR url={url} model={model_size}")
+    with file_path.open("rb") as fh:
+        files = {"file": (file_path.name, fh, "application/octet-stream")}
+        resp = _sync_http_client.post(url, files=files, data=data)
+    resp.raise_for_status()
+    result: dict = resp.json() or {}
+    # Normalise so callers keep seeing the same keys they got from Whisper.
+    result["text"] = (result.get("text") or "").strip()
+    segments: list = result.get("segments") or []
+    if not result.get("duration") and segments:
+        result["duration"] = float(segments[-1].get("end", 0.0))
+    result.setdefault("duration", 0.0)
+    result.setdefault("language", "unknown")
+    return result
+
+
 
 
 def _fmt_duration(seconds: float) -> str:
@@ -830,8 +900,9 @@ def _fmt_duration(seconds: float) -> str:
     description=(
         "Upload an audio or video file and receive a plain-text transcription in the file's "
         "**native language** — no translation is performed. "
-        "Powered by [OpenAI Whisper](https://github.com/openai/whisper), which supports **99+ languages** "
-        "with automatic language detection.\n\n"
+        "Powered by an OpenAI-compatible LLM-ASR backend (`LLM_MODEL_ASR_BASE_URL`), e.g. "
+        "Qwen3-ASR (52 languages), Fun-ASR (31 languages), Parakeet TDT (English + 25 EU), "
+        "or Canary-Qwen (English).\n\n"
         "**Supported audio:** `.mp3` `.wav` `.flac` `.ogg` `.m4a` `.aac` `.wma` `.opus` `.webm`\n\n"
         "**Supported video:** `.mp4` `.mkv` `.avi` `.mov` `.flv` `.wmv` `.ts` `.3gp`\n\n"
         "Audio is extracted from video automatically by Whisper via `ffmpeg`.\n\n"
@@ -841,14 +912,13 @@ def _fmt_duration(seconds: float) -> str:
         "[transcribed text in native language]\n"
         "<!-- end media_to_text {filename-stem} -->\n"
         "```\n\n"
-        "**Whisper model sizes** (set via `WHISPER_MODEL_SIZE` env var or the `model_size` query param):\n\n"
-        "| Size | ~VRAM | Relative speed | Best for |\n"
-        "|----------|--------|----------------|---------------------------------|\n"
-        "| tiny | ~1 GB | ~32× | Quick drafts, low-resource hosts |\n"
-        "| base | ~1 GB | ~16× | Good accuracy, fast (default) |\n"
-        "| small | ~2 GB | ~6× | Balanced accuracy/speed |\n"
-        "| medium | ~5 GB | ~2× | High accuracy |\n"
-        "| large-v3 | ~10 GB | 1× | Best accuracy, all languages |\n\n"
+        "**ASR model** (set via `DOC2MD_ASR_MODEL` env var or the `model_size` query param):\n\n"
+        "| Model | Languages | Best for |\n"
+        "|-----------------------|-----------|------------------------------------------|\n"
+        "| qwen3-asr-1.7b | 52 | Multilingual, noisy audio, video soundtracks |\n"
+        "| parakeet-tdt-0.6b-v3 | EN + 25 EU | Fastest, built-in word timestamps |\n"
+        "| canary-qwen-2.5b | EN | Highest English accuracy |\n"
+        "| fun-asr-nano | 31 | Full pipeline incl. diarization |\n\n"
         "> **System requirement:** `ffmpeg` must be installed and on `$PATH`.\n"
         "> Install with `sudo apt install ffmpeg` (Debian/Ubuntu) or `brew install ffmpeg` (macOS).\n"
     ),
@@ -861,10 +931,11 @@ def _fmt_duration(seconds: float) -> str:
 async def media_to_text(
     file: UploadFile = File(..., description="Audio or video file to transcribe."),
     model_size: str = Query(
-        WHISPER_MODEL_SIZE,
+        ASR_MODEL,
         description=(
-            "Whisper model size: `tiny`, `base`, `small`, `medium`, `large`, `large-v2`, `large-v3`. "
-            f"(Env: `WHISPER_MODEL_SIZE`, current default: `{WHISPER_MODEL_SIZE}`)"
+            "ASR model name as served by the LLM-ASR backend, e.g. `qwen3-asr-1.7b`, "
+            "`parakeet-tdt-0.6b-v3`, `canary-qwen-2.5b`, `fun-asr-nano`. "
+            f"(Env: `DOC2MD_ASR_MODEL`, current default: `{ASR_MODEL}`)"
         ),
     ),
     language: Optional[str] = Query(
@@ -922,8 +993,7 @@ async def media_to_text(
 
         detected_lang: str = result.get("language", "unknown")
         text: str = (result.get("text") or "").strip()
-        segments: list = result.get("segments") or []
-        duration_sec = float(segments[-1]["end"]) if segments else 0.0
+        duration_sec = float(result.get("duration") or 0.0)
         duration_str = _fmt_duration(duration_sec)
         slug = _slugify(Path(file.filename or "media").stem)
 

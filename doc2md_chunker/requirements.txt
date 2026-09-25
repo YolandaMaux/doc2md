@@ -20,3 +20,4 @@ qdrant_client
 python-docx
 ollama
 numpy
+filetype

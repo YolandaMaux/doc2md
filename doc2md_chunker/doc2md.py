@@ -108,7 +108,7 @@ formats to Markdown, provides image description capabilities, chunking, and tran
 * **Text Chunking**: Split documents into manageable chunks using various strategies
 * **Translation**: Translate text and documents between languages
 * **Language Detection**: Identify the language of text or documents
-* **Media Transcription**: Transcribe audio and video files to text via OpenAI Whisper
+* **Media Transcription**: Transcribe audio and video files to text via an OpenAI-compatible LLM-ASR backend
 
 ## Supported Document Formats
 
@@ -131,7 +131,7 @@ All processing keywords default to `false` on `/convert/convert` and `/convert/c
 - `process_tables` — describe table and grid-like images
 - `process_figures` — describe charts, graphs, diagrams, and figures
 - `process_images` — describe general pictures, photos, and illustrations
-- `do_voice_to_text` — transcribe audio or video with Whisper on `/convert/convert_all`
+- `do_voice_to_text` — transcribe audio or video with the configured LLM-ASR model on `/convert/convert_all`
 
 Only enabled processors run; disabled image categories are stripped from the Markdown output.
 """,
@@ -534,6 +534,30 @@ def any_processing_enabled(
 # ---------------------------------------------------------------------------
 # Image description — delegates to utils
 # ---------------------------------------------------------------------------
+def _figure_context_from_markdown(preceding_text: str, max_chars: int = 300) -> Optional[str]:
+    lines = [ln.strip() for ln in preceding_text.splitlines()]
+    heading = None
+    for ln in reversed(lines):
+        if ln.startswith("#"):
+            heading = ln.lstrip("#").strip()
+            break
+    nearby: list[str] = []
+    total = 0
+    for ln in reversed(lines):
+        if not ln:
+            break
+        nearby.append(ln)
+        total += len(ln)
+        if total >= max_chars:
+            break
+    nearby.reverse()
+    parts = []
+    if heading:
+        parts.append(f"Section heading: {heading}")
+    if nearby:
+        parts.append("Nearby preceding text: " + " ".join(nearby))
+    return "\n".join(parts) if parts else None
+
 def _describe_image_at_path(
     img_path: Path,
     *,
@@ -547,6 +571,7 @@ def _describe_image_at_path(
     process_tables: bool = False,
     process_figures: bool = False,
     process_images: bool = False,
+    figure_context: Optional[str] = None,
 ) -> str:
     try:
         b64 = utils._encode_image_b64(img_path)
@@ -564,7 +589,8 @@ def _describe_image_at_path(
         if category == utils.ImageCategory.figure:
             if not process_figures:
                 return ""
-            return utils._describe_figure(b64, model_figure, temperature)
+            return utils._describe_figure(b64, model_figure, temperature, figure_context)
+        
         if not process_images:
             return ""
         return utils._describe_picture(b64, model_picture, temperature)
@@ -589,6 +615,17 @@ def process_markdown_images(
     model_picture: str,
 ) -> str:
 
+    seen_figure_slugs: dict[str, int] = {}
+
+    def _dedupe_figure_anchors(description: str) -> str:
+        slugs = set(re.findall(r"figure-([a-z0-9-]+)", description))
+        for slug in sorted(slugs, key=len, reverse=True):
+            seen_figure_slugs[slug] = seen_figure_slugs.get(slug, 0) + 1
+            n = seen_figure_slugs[slug]
+            if n > 1:
+                description = description.replace(f"figure-{slug}", f"figure-{slug}-{n}")
+        return description
+
     def _repl(match: re.Match) -> str:
         alt_text = (match.group("alt") or "").strip()
         img_path_str = match.group("src").strip()
@@ -610,6 +647,8 @@ def process_markdown_images(
             logger.warning(f"Image not found: {img_path} — skipping description")
             return ""
 
+        figure_context = _figure_context_from_markdown(markdown[: match.start()])
+
         description = _describe_image_at_path(
             img_path,
             temperature=temperature,
@@ -622,15 +661,19 @@ def process_markdown_images(
             process_tables=process_tables,
             process_figures=process_figures,
             process_images=process_images,
+            figure_context=figure_context,
         )
+
         if not description:
             return ""
+
+        description = _dedupe_figure_anchors(description)
 
         label = alt_text if alt_text else "Image"
         return f"**[{label}]** {description}"
 
-    return IMAGE_PATTERN.sub(_repl, markdown)
-
+    return IMAGE_PATTERN.sub(_repl, markdown)    
+    
 
 # ---------------------------------------------------------------------------
 # /convert/convert
@@ -802,8 +845,8 @@ appropriate conversion pipeline automatically.
 |---------------|---------------------|---------------|
 | **Document** | PDF, DOCX, PPTX, XLSX, TXT, MD, HTML, HTM, CSV, JSON, XML | Document → Markdown |
 | **Image** | PNG, JPG, JPEG, WEBP, BMP, TIFF | Category-aware vision processing |
-| **Audio** | MP3, WAV, FLAC, OGG, M4A, AAC, WMA, OPUS, WEBM | Whisper speech-to-text when `do_voice_to_text=true` |
-| **Video** | MP4, MKV, AVI, MOV, FLV, WMV, TS, 3GP | Whisper speech-to-text when `do_voice_to_text=true` |
+| **Audio** | MP3, WAV, FLAC, OGG, M4A, AAC, WMA, OPUS, WEBM | LLM-ASR speech-to-text when `do_voice_to_text=true` |
+| **Video** | MP4, MKV, AVI, MOV, FLV, WMV, TS, 3GP | LLM-ASR speech-to-text when `do_voice_to_text=true` |
 
 ## Processing Keywords
 
@@ -824,7 +867,7 @@ All processing keywords default to `false`.
 
 - **413** File too large (default limit: 100 MB)
 - **400** Unsupported file extension or media transcription disabled
-- **500** Conversion, LLM, or Whisper error — check service logs
+- **500** Conversion, LLM, or ASR error — check service logs
 """,
     tags=["Conversion"],
     response_description=(
@@ -885,14 +928,14 @@ async def convert_all(
         utils.MODEL_FIGURE,
         description="Vision model for Figure/chart-category images when `process_figures=true`.",
     ),
-    whisper_model_size: str = Query(
-        utils.WHISPER_MODEL_SIZE,
-        description=(
-            "Whisper model size for audio/video transcription: "
-            "`tiny`, `base`, `small`, `medium`, `large`, `large-v2`, `large-v3`. "
-            "Ignored unless `do_voice_to_text=true`."
-        ),
+whisper_model_size: str = Query(
+    utils.ASR_MODEL,
+    description=(
+        "ASR model name for audio/video transcription, e.g. `qwen3-asr-1.7b`, "
+        "`parakeet-tdt-0.6b-v3`, `canary-qwen-2.5b`, `fun-asr-nano`. "
+        "Ignored unless `do_voice_to_text=true`."
     ),
+),
     whisper_language: Optional[str] = Query(
         None,
         description=(
@@ -964,8 +1007,7 @@ async def convert_all(
 
             detected_lang: str = result.get("language", "unknown")
             text: str = (result.get("text") or "").strip()
-            segments: list = result.get("segments") or []
-            duration_sec = float(segments[-1]["end"]) if segments else 0.0
+            duration_sec = float(result.get("duration") or 0.0)
             duration_str = utils._fmt_duration(duration_sec)
             slug = utils._slugify(Path(file.filename or "media").stem)
 

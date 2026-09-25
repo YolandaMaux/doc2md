@@ -48,6 +48,13 @@ try:
 except ImportError:
     _HAS_TABLE_CHUNKER = False
 
+try:
+    from chonkie import FastChunker
+    HAS_FAST_CHUNKER = True
+except ImportError:
+    HAS_FAST_CHUNKER = False
+
+
 from dotenv import load_dotenv
 
 ENV_PATH = Path(__file__).resolve().parent.parent / "doc2md_chunker.env"
@@ -270,6 +277,26 @@ async def chunk_token(
     chunks = chunker.chunk(text)
     chunker_type = "word" if tokenizer == "word" else "token"
     return build_chunks_response(chunks, document_name=file.filename, chunker_type=chunker_type)
+
+# ---------------------------------------------------------------------------
+# Fast Chunker
+# ---------------------------------------------------------------------------
+@router.post("/fast", response_model=ChunkMetadataResponse)
+async def chunk_fast(
+    file: UploadFile = File(...),
+    chunk_size: int = Query(2048),
+):
+    """SIMD-accelerated byte-level chunker (chonkie-chunker). No model required."""
+    try:
+        text = await _read_upload_stream(file)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read file: {e}")
+    if not HAS_FAST_CHUNKER:
+        raise HTTPException(status_code=501, detail="FastChunker not available. pip install --upgrade chonkie")
+    chunker = FastChunker(chunk_size=chunk_size)
+    chunks = chunker.chunk(text)
+    return _build_chunks_response(chunks, document_name=file.filename, chunker_type="fast")
+
 
 
 # ---------------------------------------------------------------------------
